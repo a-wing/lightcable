@@ -1,15 +1,15 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
 	"net/http"
 
-	"github.com/gorilla/mux"
+	"lightcable"
 )
 
 func main() {
-
 	address := flag.String("p", "0.0.0.0:8080", "set server port")
 	help := flag.Bool("h", false, "this help")
 	flag.Parse()
@@ -19,14 +19,10 @@ func main() {
 		return
 	}
 
-	hub := newHub()
-	r := mux.NewRouter()
-
-	r.HandleFunc("/ws/{id:[0-9]+}", func(w http.ResponseWriter, r *http.Request) {
-		serveWs(hub, w, r)
-	})
+	server := lightcable.NewServer()
+	go server.Run(context.Background())
 
 	log.Println("===============")
 	log.Println("Listen Port", *address)
-	log.Fatal(http.ListenAndServe(*address, r))
+	log.Fatal(http.ListenAndServe(*address, server))
 }

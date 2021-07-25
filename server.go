@@ -1,83 +1,90 @@
-package main
+package lightcable
 
 import (
-	"log"
+	"context"
+	"encoding/base64"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
 
 	"github.com/gorilla/websocket"
 )
 
-type Message struct {
-	conn *websocket.Conn
-	msg  []byte
+type Server struct {
+	topic map[string]*topic
+
+	// Register requests from the clients.
+	register chan *Client
+
+	// Inbound messages from the clients.
+	broadcast chan []byte
+
+	// Unregister requests from clients.
+	unregister chan *Client
+
+	// TODO:
+	// onConnClose(*Client, error)
+	// OnMessage(*message)
+	//onConnect func(*Client)
+	// hook onConnect
+	// hook disconnected
+	// hook ommessage
+	// func send message
 }
 
-type Cable struct {
-	Message *Message
-	conns   []*websocket.Conn
-}
+func NewServer() *Server {
+	return &Server{
+		topic: make(map[string]*topic),
 
-func newCable(msg []byte, conn *websocket.Conn) *Cable {
-	return &Cable{
-		conns: []*websocket.Conn{conn},
-		Message: &Message{
-			conn: conn,
-			msg:  msg,
-		},
+		register:   make(chan *Client),
+		broadcast:  make(chan []byte),
+		unregister: make(chan *Client),
 	}
 }
 
-func (this *Cable) Register(conn *websocket.Conn) {
-	this.conns = append(this.conns, conn)
-}
-
-func (this *Cable) Unregister(conn *websocket.Conn) {
-	for index, link := range this.conns {
-		if link == conn {
-
-			// Order is not important
-			this.conns[index] = this.conns[len(this.conns)-1]
-			this.conns = this.conns[:len(this.conns)-1]
-		}
-	}
-}
-
-func (this *Cable) Broadcast(msg *Message) {
-	log.Println("run Broadcast")
-	for _, conn := range this.conns {
-		log.Println(&conn)
-		if msg.conn != conn {
-			err := conn.WriteMessage(websocket.TextMessage, msg.msg)
-			if err != nil {
-				log.Println(err)
-				this.Unregister(conn)
+func (s *Server) Run(ctx context.Context) {
+	for {
+		select {
+		// unregister must first
+		// close and open concurrency
+		case c := <-s.unregister:
+			delete(s.topic, c.cable)
+		case c := <-s.register:
+			c.topic = s.topic[c.cable]
+			if c.topic == nil {
+				c.topic = NewTopic(c.cable, s)
+				go c.topic.run(ctx)
+				s.topic[c.cable] = c.topic
 			}
+			c.topic.register <- c
 
+		case <-ctx.Done():
+			// safe Close
 		}
 	}
 }
 
-type Hub struct {
-	Cables map[string]*Cable
-}
-
-func newHub() *Hub {
-	return &Hub{
-		//broadcast:  make(chan []byte),
-		Cables: make(map[string]*Cable),
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, err.Error())
 	}
+	token := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%d", &conn)))
+	s.JoinCable(r.URL.Path, token, conn)
 }
 
-func (this *Hub) Add(name string, cable *Cable) {
-	this.Cables[name] = cable
-}
-
-func (this *Hub) Remove(name string) {
-	delete(this.Cables, name)
-}
-
-func (this *Hub) Broadcast(name string, msg *Message) {
-	if cable := this.Cables[name]; cable != nil {
-		log.Println(name, "cable is: ", cable)
-		cable.Broadcast(msg)
+func (s *Server) JoinCable(cable, label string, conn *websocket.Conn) error {
+	select {
+	case s.register <- &Client{
+		cable: cable,
+		label: label,
+		conn:  conn,
+		send:  make(chan message, 256),
+	}:
+		return nil
+	default:
+		return errors.New("join failure")
 	}
 }

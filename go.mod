@@ -1,8 +1,5 @@
 module lightcable
 
-go 1.13
+go 1.16
 
-require (
-	github.com/gorilla/mux v1.7.4
-	github.com/gorilla/websocket v1.4.1
-)
+require github.com/gorilla/websocket v1.4.2
