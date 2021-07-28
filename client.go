@@ -26,23 +26,26 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin:     func(r *http.Request) bool { return true },
 }
 
-type message struct {
+type Message struct {
+	Room string
+	Name string
+	Code int
+	Data []byte
 	conn *websocket.Conn
-	code int
-	data []byte
 }
 
 // Client is a middleman between the websocket connection and the hub.
 type Client struct {
-	cable string
-	label string
+	Name string
+	Room string
+
 	topic *topic
 
 	// The websocket connection.
 	conn *websocket.Conn
 
 	// Buffered channel of outbound messages.
-	send chan message
+	send chan Message
 }
 
 // readPump pumps messages from the websocket connection to the hub.
@@ -65,10 +68,12 @@ func (c *Client) readPump() {
 			}
 			break
 		}
-		c.topic.broadcast <- message{
-			code: code,
+		c.topic.broadcast <- Message{
+			Name: c.Name,
+			Room: c.Room,
+			Code: code,
+			Data: data,
 			conn: c.conn,
-			data: data,
 		}
 	}
 }
@@ -94,7 +99,7 @@ func (c *Client) writePump(ctx context.Context) {
 				return
 			}
 
-			if err := c.conn.WriteMessage(msg.code, msg.data); err != nil {
+			if err := c.conn.WriteMessage(msg.Code, msg.Data); err != nil {
 				return
 			}
 

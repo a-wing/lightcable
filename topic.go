@@ -5,7 +5,7 @@ import (
 )
 
 type topic struct {
-	name   string
+	room   string
 	server *Server
 
 	// Registered clients.
@@ -15,25 +15,26 @@ type topic struct {
 	register chan *Client
 
 	// Inbound messages from the clients.
-	broadcast chan message
+	broadcast chan Message
 
 	// Unregister requests from clients.
 	unregister chan *Client
 }
 
-func NewTopic(name string, server *Server) *topic {
+func NewTopic(room string, server *Server) *topic {
 	return &topic{
-		name:   name,
+		room:   room,
 		server: server,
 
 		clients:    make(map[*Client]bool),
 		register:   make(chan *Client),
-		broadcast:  make(chan message),
+		broadcast:  make(chan Message),
 		unregister: make(chan *Client),
 	}
 }
 
 func (t *topic) run(ctx context.Context) {
+	defer t.server.onRoomClose(t.room)
 	for {
 		select {
 		case client := <-t.register:
@@ -47,11 +48,15 @@ func (t *topic) run(ctx context.Context) {
 				delete(t.clients, client)
 				close(client.send)
 			}
+			t.server.onConnClose(client)
+
+			// Last client, need close this room
 			if len(t.clients) == 0 {
 				t.server.unregister <- client
 				return
 			}
 		case message := <-t.broadcast:
+			t.server.onMessage(&message)
 			for client := range t.clients {
 				if message.conn != client.conn {
 					select {

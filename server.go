@@ -31,7 +31,23 @@ type Server struct {
 	// hook disconnected
 	// hook ommessage
 	// func send message
+	onMessage func(*Message)
+
+	onServClose func()
+	onRoomClose func(room string)
+	onConnClose func(*Client)
 }
+
+type Config struct {
+	OnMessage func(*Message)
+	// Safe Close
+	OnServClose func()
+	OnRoomClose func(room string)
+	OnConnClose func(*Client)
+}
+
+// TODO: maybe need
+// func (s *Server) GetStats() {}
 
 func NewServer() *Server {
 	return &Server{
@@ -40,6 +56,11 @@ func NewServer() *Server {
 		register:   make(chan *Client),
 		broadcast:  make(chan []byte),
 		unregister: make(chan *Client),
+
+		onMessage:   func(*Message) {},
+		onServClose: func() {},
+		onRoomClose: func(room string) {},
+		onConnClose: func(*Client) {},
 	}
 }
 
@@ -49,13 +70,13 @@ func (s *Server) Run(ctx context.Context) {
 		// unregister must first
 		// close and open concurrency
 		case c := <-s.unregister:
-			delete(s.topic, c.cable)
+			delete(s.topic, c.Room)
 		case c := <-s.register:
-			c.topic = s.topic[c.cable]
+			c.topic = s.topic[c.Room]
 			if c.topic == nil {
-				c.topic = NewTopic(c.cable, s)
+				c.topic = NewTopic(c.Room, s)
 				go c.topic.run(ctx)
-				s.topic[c.cable] = c.topic
+				s.topic[c.Room] = c.topic
 			}
 			c.topic.register <- c
 
@@ -75,16 +96,42 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.JoinCable(r.URL.Path, token, conn)
 }
 
-func (s *Server) JoinCable(cable, label string, conn *websocket.Conn) error {
+func (s *Server) JoinCable(room, name string, conn *websocket.Conn) error {
 	select {
 	case s.register <- &Client{
-		cable: cable,
-		label: label,
-		conn:  conn,
-		send:  make(chan message, 256),
+		Room: room,
+		Name: name,
+		conn: conn,
+		send: make(chan Message, 256),
 	}:
 		return nil
 	default:
 		return errors.New("join failure")
+	}
+}
+
+// All room broadcast
+func (s *Server) AllBroadcast(typ int, data []byte) {
+	for _, topic := range s.topic {
+		topic.broadcast <- Message{
+			//Name: ,
+			//Room: ,
+			Code: typ,
+			Data: data,
+			//conn: ,
+		}
+	}
+}
+
+// room broadcast
+func (s *Server) Broadcast(room string, typ int, data []byte) {
+	if topic, ok := s.topic[room]; ok {
+		topic.broadcast <- Message{
+			//Name: ,
+			//Room: ,
+			Code: typ,
+			Data: data,
+			//conn: ,
+		}
 	}
 }
