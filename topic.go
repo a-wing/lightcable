@@ -40,7 +40,7 @@ func (t *topic) run(ctx context.Context) {
 			t.clients[client] = true
 
 			go client.readPump()
-			go client.writePump()
+			go client.writePump(ctx)
 
 		case client := <-t.unregister:
 			if _, ok := t.clients[client]; ok {

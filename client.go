@@ -1,6 +1,7 @@
 package lightcable
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"time"
@@ -77,7 +78,7 @@ func (c *Client) readPump() {
 // A goroutine running writePump is started for each connection. The
 // application ensures that there is at most one writer to a connection by
 // executing all writes from this goroutine.
-func (c *Client) writePump() {
+func (c *Client) writePump(ctx context.Context) {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
@@ -102,6 +103,9 @@ func (c *Client) writePump() {
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
 			}
+		case <-ctx.Done():
+			c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+			return
 		}
 	}
 }
