@@ -53,6 +53,7 @@ func (t *topic) run(ctx context.Context) {
 			// Last client, need close this room
 			if len(t.clients) == 0 {
 				t.server.unregister <- client
+				t.server.onRoomClose(t.room)
 				return
 			}
 		case message := <-t.broadcast:

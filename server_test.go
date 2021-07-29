@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/rand"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -18,6 +19,10 @@ func makeWsProto(s string) string {
 func TestServer(t *testing.T) {
 	server := NewServer()
 	ctx, cancel := context.WithCancel(context.Background())
+	sign := make(chan bool)
+	server.onServClose = func() {
+		sign <- true
+	}
 	go server.Run(ctx)
 
 	httpServer := httptest.NewServer(server)
@@ -64,4 +69,36 @@ func TestServer(t *testing.T) {
 	}
 
 	cancel()
+	<-sign
+}
+
+func TestServerVeryMuchRoom(t *testing.T) {
+	server := NewServer()
+	ctx, cancel := context.WithCancel(context.Background())
+	sign := make(chan bool)
+	server.onServClose = func() {
+		sign <- true
+	}
+	go server.Run(ctx)
+
+	httpServer := httptest.NewServer(server)
+
+	data := make([]byte, 4096)
+	for i := 0; i < 4096; i++ {
+		cable := "/test-" + strconv.Itoa(i)
+		ws, _, err := websocket.DefaultDialer.DialContext(ctx, makeWsProto(httpServer.URL+cable), nil)
+		if err != nil {
+			t.Error(err)
+		}
+
+		for i := 0; i < 10; i++ {
+			n, err := rand.Read(data)
+			if err != nil {
+				t.Error(err)
+			}
+			ws.WriteMessage(websocket.TextMessage, data[:n])
+		}
+	}
+	cancel()
+	<-sign
 }

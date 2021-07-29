@@ -11,6 +11,15 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+type readyState int8
+
+const (
+	readyStateOpening readyState = iota
+	readyStateRunning
+	readyStateClosing
+	readyStateClosed
+)
+
 type Server struct {
 	topic map[string]*topic
 
@@ -23,6 +32,7 @@ type Server struct {
 	// Unregister requests from clients.
 	unregister chan *Client
 
+	readyState
 	// TODO:
 	// onConnClose(*Client, error)
 	// OnMessage(*message)
@@ -65,12 +75,20 @@ func NewServer() *Server {
 }
 
 func (s *Server) Run(ctx context.Context) {
+	s.readyState = readyStateRunning
 	for {
 		select {
 		// unregister must first
 		// close and open concurrency
 		case c := <-s.unregister:
 			delete(s.topic, c.Room)
+
+			// Last room, server onClose
+			if len(s.topic) == 0 && s.readyState == readyStateClosing {
+				s.onServClose()
+				s.readyState = readyStateClosed
+				return
+			}
 		case c := <-s.register:
 			c.topic = s.topic[c.Room]
 			if c.topic == nil {
@@ -81,7 +99,7 @@ func (s *Server) Run(ctx context.Context) {
 			c.topic.register <- c
 
 		case <-ctx.Done():
-			// safe Close
+			s.readyState = readyStateClosing
 		}
 	}
 }
