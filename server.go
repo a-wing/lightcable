@@ -33,16 +33,8 @@ type Server struct {
 	unregister chan *Client
 
 	readyState
-	// TODO:
-	// onConnClose(*Client, error)
-	// OnMessage(*message)
-	//onConnect func(*Client)
-	// hook onConnect
-	// hook disconnected
-	// hook ommessage
-	// func send message
-	onMessage func(*Message)
 
+	onMessage func(*Message)
 	onServClose func()
 	onRoomClose func(room string)
 	onConnClose func(*Client)
@@ -55,9 +47,6 @@ type Config struct {
 	OnRoomClose func(room string)
 	OnConnClose func(*Client)
 }
-
-// TODO: maybe need
-// func (s *Server) GetStats() {}
 
 func NewServer() *Server {
 	return &Server{
@@ -125,31 +114,5 @@ func (s *Server) JoinCable(room, name string, conn *websocket.Conn) error {
 		return nil
 	default:
 		return errors.New("join failure")
-	}
-}
-
-// All room broadcast
-func (s *Server) AllBroadcast(typ int, data []byte) {
-	for _, topic := range s.topic {
-		topic.broadcast <- Message{
-			//Name: ,
-			//Room: ,
-			Code: typ,
-			Data: data,
-			//conn: ,
-		}
-	}
-}
-
-// room broadcast
-func (s *Server) Broadcast(room string, typ int, data []byte) {
-	if topic, ok := s.topic[room]; ok {
-		topic.broadcast <- Message{
-			//Name: ,
-			//Room: ,
-			Code: typ,
-			Data: data,
-			//conn: ,
-		}
 	}
 }
