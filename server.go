@@ -2,9 +2,6 @@ package lightcable
 
 import (
 	"context"
-	"encoding/base64"
-	"errors"
-	"fmt"
 	"io"
 	"net/http"
 
@@ -34,10 +31,11 @@ type Server struct {
 
 	readyState
 
-	onMessage func(*Message)
-	onServClose func()
-	onRoomClose func(room string)
-	onConnClose func(*Client)
+	OnMessage func(*Message)
+	OnConnected func(w http.ResponseWriter, r *http.Request) (room, name string, ok bool)
+	OnServClose func()
+	OnRoomClose func(room string)
+	OnConnClose func(*Client)
 }
 
 type Config struct {
@@ -56,10 +54,13 @@ func NewServer() *Server {
 		broadcast:  make(chan []byte),
 		unregister: make(chan *Client),
 
-		onMessage:   func(*Message) {},
-		onServClose: func() {},
-		onRoomClose: func(room string) {},
-		onConnClose: func(*Client) {},
+		OnMessage:   func(*Message) {},
+		OnConnected: func(w http.ResponseWriter, r *http.Request) (room, name string, ok bool) {
+			return r.URL.Path, getUniqueID(), true
+		},
+		OnServClose: func() {},
+		OnRoomClose: func(room string) {},
+		OnConnClose: func(*Client) {},
 	}
 }
 
@@ -74,7 +75,7 @@ func (s *Server) Run(ctx context.Context) {
 
 			// Last room, server onClose
 			if len(s.topic) == 0 && s.readyState == readyStateClosing {
-				s.onServClose()
+				s.OnServClose()
 				s.readyState = readyStateClosed
 				return
 			}
@@ -94,25 +95,23 @@ func (s *Server) Run(ctx context.Context) {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	conn, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, err.Error())
-	}
-	token := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%d", &conn)))
-	s.JoinCable(r.URL.Path, token, conn)
-}
+	if room, name, ok := s.OnConnected(w, r); ok {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			io.WriteString(w, err.Error())
+		}
 
-func (s *Server) JoinCable(room, name string, conn *websocket.Conn) error {
-	select {
-	case s.register <- &Client{
-		Room: room,
-		Name: name,
-		conn: conn,
-		send: make(chan Message, 256),
-	}:
-		return nil
-	default:
-		return errors.New("join failure")
+		// The server lack of resources: close the connection
+		select {
+			case s.register <- &Client{
+				Room: room,
+				Name: name,
+				conn: conn,
+				send: make(chan Message, 256),
+			}:
+		default:
+			conn.WriteMessage(websocket.CloseMessage, []byte{})
+		}
 	}
 }

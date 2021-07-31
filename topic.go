@@ -34,7 +34,7 @@ func NewTopic(room string, server *Server) *topic {
 }
 
 func (t *topic) run(ctx context.Context) {
-	defer t.server.onRoomClose(t.room)
+	defer t.server.OnRoomClose(t.room)
 	for {
 		select {
 		case client := <-t.register:
@@ -48,16 +48,16 @@ func (t *topic) run(ctx context.Context) {
 				delete(t.clients, client)
 				close(client.send)
 			}
-			t.server.onConnClose(client)
+			t.server.OnConnClose(client)
 
 			// Last client, need close this room
 			if len(t.clients) == 0 {
 				t.server.unregister <- client
-				t.server.onRoomClose(t.room)
+				t.server.OnRoomClose(t.room)
 				return
 			}
 		case message := <-t.broadcast:
-			t.server.onMessage(&message)
+			t.server.OnMessage(&message)
 			for client := range t.clients {
 				if message.conn != client.conn {
 					select {

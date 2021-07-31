@@ -20,7 +20,7 @@ func TestServer(t *testing.T) {
 	server := NewServer()
 	ctx, cancel := context.WithCancel(context.Background())
 	sign := make(chan bool)
-	server.onServClose = func() {
+	server.OnServClose = func() {
 		sign <- true
 	}
 	go server.Run(ctx)
@@ -76,7 +76,7 @@ func TestServerVeryMuchRoom(t *testing.T) {
 	server := NewServer()
 	ctx, cancel := context.WithCancel(context.Background())
 	sign := make(chan bool)
-	server.onServClose = func() {
+	server.OnServClose = func() {
 		sign <- true
 	}
 	go server.Run(ctx)
