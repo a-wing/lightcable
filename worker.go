@@ -27,9 +27,9 @@ func newWorker(room string, server *Server) *worker {
 		server: server,
 
 		clients:    make(map[*Client]bool),
-		register:   make(chan *Client),
-		broadcast:  make(chan Message),
-		unregister: make(chan *Client),
+		register:   make(chan *Client, server.config.SignBufferCount),
+		broadcast:  make(chan Message, server.config.CastBufferCount),
+		unregister: make(chan *Client, server.config.SignBufferCount),
 	}
 }
 
@@ -43,6 +43,7 @@ func (w *worker) run(ctx context.Context) {
 			go client.readPump()
 			go client.writePump(ctx)
 
+			w.server.OnConnReady(client)
 		case client := <-w.unregister:
 			if _, ok := w.clients[client]; ok {
 				delete(w.clients, client)

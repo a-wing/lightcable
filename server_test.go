@@ -17,11 +17,15 @@ func makeWsProto(s string) string {
 }
 
 func TestServer(t *testing.T) {
-	server := NewServer()
+	server := New(DefaultConfig)
 	ctx, cancel := context.WithCancel(context.Background())
 	sign := make(chan bool)
 	server.OnServClose = func() {
 		sign <- true
+	}
+	join := make(chan string)
+	server.OnConnReady = func(c *Client) {
+		join <- c.Name
 	}
 	go server.Run(ctx)
 
@@ -38,6 +42,10 @@ func TestServer(t *testing.T) {
 		t.Error(err)
 	}
 
+	// Need wait for connection ready
+	<-join
+	<-join
+
 	for i := 0; i < 10; i++ {
 		data := make([]byte, 4096)
 		n, err := rand.Read(data)
@@ -46,12 +54,12 @@ func TestServer(t *testing.T) {
 		}
 		ws.WriteMessage(websocket.TextMessage, data[:n])
 
-		typ, recv, err := ws2.ReadMessage()
+		code, recv, err := ws2.ReadMessage()
 		if err != nil {
 			t.Error(err)
 		}
 
-		if typ != websocket.TextMessage {
+		if code != websocket.TextMessage {
 			t.Error("Type should TextMessage")
 		}
 
@@ -73,11 +81,15 @@ func TestServer(t *testing.T) {
 }
 
 func TestServerBroadcast(t *testing.T) {
-	server := NewServer()
+	server := New(DefaultConfig)
 	ctx, cancel := context.WithCancel(context.Background())
 	sign := make(chan bool)
 	server.OnServClose = func() {
 		sign <- true
+	}
+	join := make(chan string)
+	server.OnConnReady = func(c *Client) {
+		join <- c.Name
 	}
 	go server.Run(ctx)
 
@@ -98,6 +110,11 @@ func TestServerBroadcast(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+
+	// Need wait for connection ready
+	<-join
+	<-join
+	<-join
 
 	for i := 0; i < 10; i++ {
 		data := make([]byte, 4096)
@@ -147,22 +164,30 @@ func TestServerBroadcast(t *testing.T) {
 }
 
 func TestServerVeryMuchRoom(t *testing.T) {
-	server := NewServer()
+	server := New(DefaultConfig)
 	ctx, cancel := context.WithCancel(context.Background())
 	sign := make(chan bool)
 	server.OnServClose = func() {
 		sign <- true
 	}
+	join := make(chan string)
+	server.OnConnReady = func(c *Client) {
+		join <- c.Room
+	}
 	go server.Run(ctx)
 
 	httpServer := httptest.NewServer(server)
 
-	for i := 0; i < 4096; i++ {
+	for i := 0; i < 128; i++ {
 		data := make([]byte, 4096)
 		cable := "/test-" + strconv.Itoa(i)
 		ws, _, err := websocket.DefaultDialer.DialContext(ctx, makeWsProto(httpServer.URL+cable), nil)
 		if err != nil {
 			t.Error(err)
+		}
+
+		if room := <-join; cable != room {
+			t.Errorf("Not Join successfully: %s, %s", cable, room)
 		}
 
 		for i := 0; i < 10; i++ {

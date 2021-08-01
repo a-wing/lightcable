@@ -19,7 +19,7 @@ func main() {
 		return
 	}
 
-	server := lightcable.NewServer()
+	server := lightcable.New(lightcable.DefaultConfig)
 	go server.Run(context.Background())
 
 	log.Println("===============")

@@ -18,6 +18,7 @@ const (
 )
 
 type Server struct {
+	config *Config
 	worker map[string]*worker
 
 	// Register requests from the clients.
@@ -33,31 +34,26 @@ type Server struct {
 
 	OnMessage   func(*Message)
 	OnConnected func(w http.ResponseWriter, r *http.Request) (room, name string, ok bool)
+	OnConnReady func(*Client)
 	OnServClose func()
 	OnRoomClose func(room string)
 	OnConnClose func(*Client)
 }
 
-type Config struct {
-	OnMessage func(*Message)
-	// Safe Close
-	OnServClose func()
-	OnRoomClose func(room string)
-	OnConnClose func(*Client)
-}
-
-func NewServer() *Server {
+func New(cfg *Config) *Server {
 	return &Server{
+		config: cfg.Worker,
 		worker: make(map[string]*worker),
 
-		register:   make(chan *Client),
-		broadcast:  make(chan Message),
-		unregister: make(chan *Client),
+		register:   make(chan *Client, cfg.SignBufferCount),
+		broadcast:  make(chan Message, cfg.CastBufferCount),
+		unregister: make(chan *Client, cfg.SignBufferCount),
 
 		OnMessage: func(*Message) {},
 		OnConnected: func(w http.ResponseWriter, r *http.Request) (room, name string, ok bool) {
 			return r.URL.Path, getUniqueID(), true
 		},
+		OnConnReady: func(*Client) {},
 		OnServClose: func() {},
 		OnRoomClose: func(room string) {},
 		OnConnClose: func(*Client) {},
