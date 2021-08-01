@@ -1,4 +1,4 @@
-module lightcable
+module github.com/a-wing/lightcable
 
 go 1.13
 
