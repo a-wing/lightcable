@@ -69,8 +69,6 @@ func (w *worker) run(ctx context.Context) {
 					}
 				}
 			}
-		case <-ctx.Done():
-			// safe Close
 		}
 	}
 }
