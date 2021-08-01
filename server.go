@@ -24,14 +24,14 @@ type Server struct {
 	register chan *Client
 
 	// Inbound messages from the clients.
-	broadcast chan []byte
+	broadcast chan Message
 
 	// Unregister requests from clients.
 	unregister chan *Client
 
 	readyState
 
-	OnMessage func(*Message)
+	OnMessage   func(*Message)
 	OnConnected func(w http.ResponseWriter, r *http.Request) (room, name string, ok bool)
 	OnServClose func()
 	OnRoomClose func(room string)
@@ -51,10 +51,10 @@ func NewServer() *Server {
 		topic: make(map[string]*topic),
 
 		register:   make(chan *Client),
-		broadcast:  make(chan []byte),
+		broadcast:  make(chan Message),
 		unregister: make(chan *Client),
 
-		OnMessage:   func(*Message) {},
+		OnMessage: func(*Message) {},
 		OnConnected: func(w http.ResponseWriter, r *http.Request) (room, name string, ok bool) {
 			return r.URL.Path, getUniqueID(), true
 		},
@@ -87,7 +87,10 @@ func (s *Server) Run(ctx context.Context) {
 				s.topic[c.Room] = c.topic
 			}
 			c.topic.register <- c
-
+		case m := <-s.broadcast:
+			if topic, ok := s.topic[m.Room]; ok {
+				topic.broadcast <- m
+			}
 		case <-ctx.Done():
 			s.readyState = readyStateClosing
 		}
@@ -104,14 +107,25 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		// The server lack of resources: close the connection
 		select {
-			case s.register <- &Client{
-				Room: room,
-				Name: name,
-				conn: conn,
-				send: make(chan Message, 256),
-			}:
+		case s.register <- &Client{
+			Room: room,
+			Name: name,
+			conn: conn,
+			send: make(chan Message, 256),
+		}:
 		default:
 			conn.WriteMessage(websocket.CloseMessage, []byte{})
 		}
+	}
+}
+
+// https://www.rfc-editor.org/rfc/rfc6455.html#section-11.8
+// code is websocket Opcode
+func (s *Server) Broadcast(room, name string, code int, data []byte) {
+	s.broadcast <- Message{
+		Name: name,
+		Room: room,
+		Code: code,
+		Data: data,
 	}
 }
