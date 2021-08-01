@@ -2,7 +2,8 @@
 
 lightweight websocket channel server
 
-[![Build Status](https://github.com/a-wing/lightcable/workflows/ci/badge.svg)](https://github.com/a-wing/lightcable/actions?query=workflow%3Ago)
+[![Build Status](https://github.com/a-wing/lightcable/workflows/ci/badge.svg)](https://github.com/a-wing/lightcable/actions?query=workflow%3Aci)
+[![codecov](https://codecov.io/gh/a-wing/lightcable/branch/master/graph/badge.svg)](https://codecov.io/gh/a-wing/lightcable)
 [![Go Report Card](https://goreportcard.com/badge/github.com/a-wing/lightcable)](https://goreportcard.com/report/github.com/a-wing/lightcable)
 [![Go Reference](https://pkg.go.dev/badge/github.com/a-wing/lightcable.svg)](https://pkg.go.dev/github.com/a-wing/lightcable)
 [![GitHub release](https://img.shields.io/github/tag/a-wing/lightcable.svg?label=release)](https://github.com/a-wing/lightcable/releases)
