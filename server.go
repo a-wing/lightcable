@@ -82,7 +82,7 @@ func (s *Server) Run(ctx context.Context) {
 		case c := <-s.register:
 			c.topic = s.topic[c.Room]
 			if c.topic == nil {
-				c.topic = NewTopic(c.Room, s)
+				c.topic = newTopic(c.Room, s)
 				go c.topic.run(ctx)
 				s.topic[c.Room] = c.topic
 			}

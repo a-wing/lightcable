@@ -21,7 +21,7 @@ type topic struct {
 	unregister chan *Client
 }
 
-func NewTopic(room string, server *Server) *topic {
+func newTopic(room string, server *Server) *topic {
 	return &topic{
 		room:   room,
 		server: server,
