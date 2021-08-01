@@ -39,7 +39,7 @@ type Client struct {
 	Name string
 	Room string
 
-	topic *topic
+	worker *worker
 
 	// The websocket connection.
 	conn *websocket.Conn
@@ -55,7 +55,7 @@ type Client struct {
 // reads from this goroutine.
 func (c *Client) readPump() {
 	defer func() {
-		c.topic.unregister <- c
+		c.worker.unregister <- c
 		c.conn.Close()
 	}()
 	c.conn.SetReadDeadline(time.Now().Add(pongWait))
@@ -68,7 +68,7 @@ func (c *Client) readPump() {
 			}
 			break
 		}
-		c.topic.broadcast <- Message{
+		c.worker.broadcast <- Message{
 			Name: c.Name,
 			Room: c.Room,
 			Code: code,

@@ -18,7 +18,7 @@ const (
 )
 
 type Server struct {
-	topic map[string]*topic
+	worker map[string]*worker
 
 	// Register requests from the clients.
 	register chan *Client
@@ -48,7 +48,7 @@ type Config struct {
 
 func NewServer() *Server {
 	return &Server{
-		topic: make(map[string]*topic),
+		worker: make(map[string]*worker),
 
 		register:   make(chan *Client),
 		broadcast:  make(chan Message),
@@ -71,25 +71,25 @@ func (s *Server) Run(ctx context.Context) {
 		// unregister must first
 		// close and open concurrency
 		case c := <-s.unregister:
-			delete(s.topic, c.Room)
+			delete(s.worker, c.Room)
 
 			// Last room, server onClose
-			if len(s.topic) == 0 && s.readyState == readyStateClosing {
+			if len(s.worker) == 0 && s.readyState == readyStateClosing {
 				s.OnServClose()
 				s.readyState = readyStateClosed
 				return
 			}
 		case c := <-s.register:
-			c.topic = s.topic[c.Room]
-			if c.topic == nil {
-				c.topic = newTopic(c.Room, s)
-				go c.topic.run(ctx)
-				s.topic[c.Room] = c.topic
+			c.worker = s.worker[c.Room]
+			if c.worker == nil {
+				c.worker = newWorker(c.Room, s)
+				go c.worker.run(ctx)
+				s.worker[c.Room] = c.worker
 			}
-			c.topic.register <- c
+			c.worker.register <- c
 		case m := <-s.broadcast:
-			if topic, ok := s.topic[m.Room]; ok {
-				topic.broadcast <- m
+			if worker, ok := s.worker[m.Room]; ok {
+				worker.broadcast <- m
 			}
 		case <-ctx.Done():
 			s.readyState = readyStateClosing

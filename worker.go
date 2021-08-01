@@ -4,7 +4,7 @@ import (
 	"context"
 )
 
-type topic struct {
+type worker struct {
 	room   string
 	server *Server
 
@@ -21,8 +21,8 @@ type topic struct {
 	unregister chan *Client
 }
 
-func newTopic(room string, server *Server) *topic {
-	return &topic{
+func newWorker(room string, server *Server) *worker {
+	return &worker{
 		room:   room,
 		server: server,
 
@@ -33,38 +33,38 @@ func newTopic(room string, server *Server) *topic {
 	}
 }
 
-func (t *topic) run(ctx context.Context) {
-	defer t.server.OnRoomClose(t.room)
+func (w *worker) run(ctx context.Context) {
+	defer w.server.OnRoomClose(w.room)
 	for {
 		select {
-		case client := <-t.register:
-			t.clients[client] = true
+		case client := <-w.register:
+			w.clients[client] = true
 
 			go client.readPump()
 			go client.writePump(ctx)
 
-		case client := <-t.unregister:
-			if _, ok := t.clients[client]; ok {
-				delete(t.clients, client)
+		case client := <-w.unregister:
+			if _, ok := w.clients[client]; ok {
+				delete(w.clients, client)
 				close(client.send)
 			}
-			t.server.OnConnClose(client)
+			w.server.OnConnClose(client)
 
 			// Last client, need close this room
-			if len(t.clients) == 0 {
-				t.server.unregister <- client
-				t.server.OnRoomClose(t.room)
+			if len(w.clients) == 0 {
+				w.server.unregister <- client
+				w.server.OnRoomClose(w.room)
 				return
 			}
-		case message := <-t.broadcast:
-			t.server.OnMessage(&message)
-			for client := range t.clients {
+		case message := <-w.broadcast:
+			w.server.OnMessage(&message)
+			for client := range w.clients {
 				if message.conn != client.conn {
 					select {
 					case client.send <- message:
 					default:
 						close(client.send)
-						delete(t.clients, client)
+						delete(w.clients, client)
 					}
 				}
 			}
