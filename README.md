@@ -13,9 +13,54 @@ lightweight websocket channel server
 
 * golang >= 1.13
 
+### Application scenario
+
+* A simple Websocket broadcast room
+* WebRTC signaling server
+* Replace [socket.io](https://socket.io/)  (Special case: client only join a room)
+* Wx APP sdk and webview communication (微信小程序下和 webview 通信)
+
 ### As a Application
 
 ```bash
 go get -u github.com/a-wing/lightcable/cmd/lightcable
+```
+
+### URL
+
+```bash
+ws://localhost:8080/{roomName}
+```
+
+### broadcast server demo
+
+Server
+
+```bash
+lightcable
+```
+
+Room: `xxx`, Client: `1`
+
+```bash
+websocat --linemode-strip-newlines 'ws://localhost:8080/xxx'
+```
+
+Room: `xxx`, Client: `2`
+
+```bash
+websocat --linemode-strip-newlines 'ws://localhost:8080/xxx'
+```
+
+Room: `xxx`, Client: `3`
+
+```bash
+websocat --linemode-strip-newlines 'ws://localhost:8080/xxx'
+```
+
+Room: `xxx-2`, Client: `4`
+
+```bash
+websocat --linemode-strip-newlines 'ws://localhost:8080/xxx-2'
 ```
 
