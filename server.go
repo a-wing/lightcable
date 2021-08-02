@@ -32,12 +32,12 @@ type Server struct {
 
 	readyState
 
-	OnMessage   func(*Message)
-	OnConnected func(w http.ResponseWriter, r *http.Request) (room, name string, ok bool)
-	OnConnReady func(*Client)
-	OnServClose func()
-	OnRoomClose func(room string)
-	OnConnClose func(*Client)
+	onMessage   func(*Message)
+	onConnected func(w http.ResponseWriter, r *http.Request) (room, name string, ok bool)
+	onConnReady func(*Client)
+	onServClose func()
+	onRoomClose func(room string)
+	onConnClose func(*Client)
 }
 
 func New(cfg *Config) *Server {
@@ -49,14 +49,14 @@ func New(cfg *Config) *Server {
 		broadcast:  make(chan Message, cfg.CastBufferCount),
 		unregister: make(chan *Client, cfg.SignBufferCount),
 
-		OnMessage: func(*Message) {},
-		OnConnected: func(w http.ResponseWriter, r *http.Request) (room, name string, ok bool) {
+		onMessage: func(*Message) {},
+		onConnected: func(w http.ResponseWriter, r *http.Request) (room, name string, ok bool) {
 			return r.URL.Path, getUniqueID(), true
 		},
-		OnConnReady: func(*Client) {},
-		OnServClose: func() {},
-		OnRoomClose: func(room string) {},
-		OnConnClose: func(*Client) {},
+		onConnReady: func(*Client) {},
+		onServClose: func() {},
+		onRoomClose: func(room string) {},
+		onConnClose: func(*Client) {},
 	}
 }
 
@@ -71,7 +71,7 @@ func (s *Server) Run(ctx context.Context) {
 
 			// Last room, server onClose
 			if len(s.worker) == 0 && s.readyState == readyStateClosing {
-				s.OnServClose()
+				s.onServClose()
 				s.readyState = readyStateClosed
 				return
 			}
@@ -94,7 +94,7 @@ func (s *Server) Run(ctx context.Context) {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if room, name, ok := s.OnConnected(w, r); ok {
+	if room, name, ok := s.onConnected(w, r); ok {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -124,4 +124,28 @@ func (s *Server) Broadcast(room, name string, code int, data []byte) {
 		Code: code,
 		Data: data,
 	}
+}
+
+func (s *Server) OnMessage(fn func(*Message)) {
+	s.onMessage = fn
+}
+
+func (s *Server) OnConnected(fn func(w http.ResponseWriter, r *http.Request) (room, name string, ok bool)) {
+	s.onConnected = fn
+}
+
+func (s *Server) OnConnReady(fn func(*Client)) {
+	s.onConnReady = fn
+}
+
+func (s *Server) OnServClose(fn func()) {
+	s.onServClose = fn
+}
+
+func (s *Server) OnRoomClose(fn func(room string)) {
+	s.onRoomClose = fn
+}
+
+func (s *Server) OnConnClose(fn func(*Client)) {
+	s.onConnClose = fn
 }

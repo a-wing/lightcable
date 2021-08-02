@@ -34,7 +34,7 @@ func newWorker(room string, server *Server) *worker {
 }
 
 func (w *worker) run(ctx context.Context) {
-	defer w.server.OnRoomClose(w.room)
+	defer w.server.onRoomClose(w.room)
 	for {
 		select {
 		case client := <-w.register:
@@ -43,22 +43,22 @@ func (w *worker) run(ctx context.Context) {
 			go client.readPump()
 			go client.writePump(ctx)
 
-			w.server.OnConnReady(client)
+			w.server.onConnReady(client)
 		case client := <-w.unregister:
 			if _, ok := w.clients[client]; ok {
 				delete(w.clients, client)
 				close(client.send)
 			}
-			w.server.OnConnClose(client)
+			w.server.onConnClose(client)
 
 			// Last client, need close this room
 			if len(w.clients) == 0 {
 				w.server.unregister <- client
-				w.server.OnRoomClose(w.room)
+				w.server.onRoomClose(w.room)
 				return
 			}
 		case message := <-w.broadcast:
-			w.server.OnMessage(&message)
+			w.server.onMessage(&message)
 			for client := range w.clients {
 				if message.conn != client.conn {
 					select {

@@ -20,13 +20,13 @@ func TestServer(t *testing.T) {
 	server := New(DefaultConfig)
 	ctx, cancel := context.WithCancel(context.Background())
 	sign := make(chan bool)
-	server.OnServClose = func() {
+	server.OnServClose(func() {
 		sign <- true
-	}
+	})
 	join := make(chan string)
-	server.OnConnReady = func(c *Client) {
+	server.OnConnReady(func(c *Client) {
 		join <- c.Name
-	}
+	})
 	go server.Run(ctx)
 
 	httpServer := httptest.NewServer(server)
@@ -84,13 +84,13 @@ func TestServerBroadcast(t *testing.T) {
 	server := New(DefaultConfig)
 	ctx, cancel := context.WithCancel(context.Background())
 	sign := make(chan bool)
-	server.OnServClose = func() {
+	server.OnServClose(func() {
 		sign <- true
-	}
+	})
 	join := make(chan string)
-	server.OnConnReady = func(c *Client) {
+	server.OnConnReady(func(c *Client) {
 		join <- c.Name
-	}
+	})
 	go server.Run(ctx)
 
 	httpServer := httptest.NewServer(server)
@@ -167,13 +167,13 @@ func TestServerVeryMuchRoom(t *testing.T) {
 	server := New(DefaultConfig)
 	ctx, cancel := context.WithCancel(context.Background())
 	sign := make(chan bool)
-	server.OnServClose = func() {
+	server.OnServClose(func() {
 		sign <- true
-	}
+	})
 	join := make(chan string)
-	server.OnConnReady = func(c *Client) {
+	server.OnConnReady(func(c *Client) {
 		join <- c.Room
-	}
+	})
 	go server.Run(ctx)
 
 	httpServer := httptest.NewServer(server)
