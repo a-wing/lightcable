@@ -2,7 +2,6 @@ package lightcable
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"time"
 
@@ -39,6 +38,8 @@ type Client struct {
 	Name string
 	Room string
 
+	err error
+
 	worker *worker
 
 	// The websocket connection.
@@ -63,9 +64,7 @@ func (c *Client) readPump() {
 	for {
 		code, data, err := c.conn.ReadMessage()
 		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("error: %v", err)
-			}
+			c.err = err
 			break
 		}
 		c.worker.broadcast <- Message{
@@ -94,18 +93,20 @@ func (c *Client) writePump(ctx context.Context) {
 		case msg, ok := <-c.send:
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
-				// The hub closed the channel.
+				// The worker closed the channel.
 				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
 
 			if err := c.conn.WriteMessage(msg.Code, msg.Data); err != nil {
+				c.err = err
 				return
 			}
 
 		case <-ticker.C:
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				c.err = err
 				return
 			}
 		case <-ctx.Done():

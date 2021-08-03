@@ -49,7 +49,7 @@ func (w *worker) run(ctx context.Context) {
 				delete(w.clients, client)
 				close(client.send)
 			}
-			w.server.onConnClose(client)
+			w.server.onConnClose(client, client.err)
 
 			// Last client, need close this room
 			if len(w.clients) == 0 {

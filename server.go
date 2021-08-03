@@ -37,7 +37,7 @@ type Server struct {
 	onConnReady func(*Client)
 	onServClose func()
 	onRoomClose func(room string)
-	onConnClose func(*Client)
+	onConnClose func(*Client, error)
 }
 
 func New(cfg *Config) *Server {
@@ -56,7 +56,7 @@ func New(cfg *Config) *Server {
 		onConnReady: func(*Client) {},
 		onServClose: func() {},
 		onRoomClose: func(room string) {},
-		onConnClose: func(*Client) {},
+		onConnClose: func(*Client, error) {},
 	}
 }
 
@@ -146,6 +146,8 @@ func (s *Server) OnRoomClose(fn func(room string)) {
 	s.onRoomClose = fn
 }
 
-func (s *Server) OnConnClose(fn func(*Client)) {
+// Client and err
+// if context server close err == nil
+func (s *Server) OnConnClose(fn func(*Client, error)) {
 	s.onConnClose = fn
 }
