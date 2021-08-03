@@ -16,8 +16,23 @@ func makeWsProto(s string) string {
 	return "ws" + strings.TrimPrefix(s, "http")
 }
 
-func TestServer(t *testing.T) {
+func makeConns(t *testing.T, rooms ...string) (*Server, []*websocket.Conn) {
 	server := New(DefaultConfig)
+	httpServer := httptest.NewServer(server)
+	conns := make([]*websocket.Conn, len(rooms))
+	var err error
+	for i, room := range rooms {
+		if conns[i], _, err = websocket.DefaultDialer.Dial(makeWsProto(httpServer.URL+room), nil); err != nil {
+			t.Error(err)
+		}
+	}
+	return server, conns
+}
+
+func TestServer(t *testing.T) {
+	server, conns := makeConns(t, "/test", "/test")
+	ws, ws2 := conns[0], conns[1]
+
 	ctx, cancel := context.WithCancel(context.Background())
 	sign := make(chan bool)
 	server.OnServClose(func() {
@@ -28,19 +43,6 @@ func TestServer(t *testing.T) {
 		join <- c.Name
 	})
 	go server.Run(ctx)
-
-	httpServer := httptest.NewServer(server)
-
-	cable := "/test"
-	ws, _, err := websocket.DefaultDialer.DialContext(ctx, makeWsProto(httpServer.URL+cable), nil)
-	if err != nil {
-		t.Error(err)
-	}
-
-	ws2, _, err := websocket.DefaultDialer.DialContext(ctx, makeWsProto(httpServer.URL+cable), nil)
-	if err != nil {
-		t.Error(err)
-	}
 
 	// Need wait for connection ready
 	<-join
@@ -81,7 +83,9 @@ func TestServer(t *testing.T) {
 }
 
 func TestServerBroadcast(t *testing.T) {
-	server := New(DefaultConfig)
+	server, conns := makeConns(t, "/test", "/test", "/test-2")
+	ws, ws2, ws3 := conns[0], conns[1], conns[2]
+
 	ctx, cancel := context.WithCancel(context.Background())
 	sign := make(chan bool)
 	server.OnServClose(func() {
@@ -92,24 +96,6 @@ func TestServerBroadcast(t *testing.T) {
 		join <- c.Name
 	})
 	go server.Run(ctx)
-
-	httpServer := httptest.NewServer(server)
-
-	cable := "/test"
-	ws, _, err := websocket.DefaultDialer.DialContext(ctx, makeWsProto(httpServer.URL+cable), nil)
-	if err != nil {
-		t.Error(err)
-	}
-
-	ws2, _, err := websocket.DefaultDialer.DialContext(ctx, makeWsProto(httpServer.URL+cable), nil)
-	if err != nil {
-		t.Error(err)
-	}
-
-	ws3, _, err := websocket.DefaultDialer.DialContext(ctx, makeWsProto(httpServer.URL+cable+"2"), nil)
-	if err != nil {
-		t.Error(err)
-	}
 
 	// Need wait for connection ready
 	<-join
@@ -122,7 +108,7 @@ func TestServerBroadcast(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		server.Broadcast(cable, "test", websocket.TextMessage, data[:n])
+		server.Broadcast("/test", "test", websocket.TextMessage, data[:n])
 
 		// ws
 		if code, recv, err := ws.ReadMessage(); err == nil {
