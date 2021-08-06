@@ -16,7 +16,7 @@ func makeWsProto(s string) string {
 	return "ws" + strings.TrimPrefix(s, "http")
 }
 
-func makeConns(t *testing.T, rooms ...string) (*Server, []*websocket.Conn) {
+func makeConns(t testing.TB, rooms ...string) (*Server, []*websocket.Conn) {
 	server := New(DefaultConfig)
 	httpServer := httptest.NewServer(server)
 	conns := make([]*websocket.Conn, len(rooms))
