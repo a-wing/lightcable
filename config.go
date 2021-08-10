@@ -1,5 +1,6 @@
 package lightcable
 
+// Server need config
 type Config struct {
 	SignBufferCount int
 	CastBufferCount int
@@ -7,6 +8,7 @@ type Config struct {
 	Worker *Config
 }
 
+// Default Server config
 var DefaultConfig = &Config{
 	SignBufferCount: 128,
 	CastBufferCount: 128,

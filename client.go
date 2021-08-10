@@ -25,6 +25,7 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin:     func(r *http.Request) bool { return true },
 }
 
+// Communication Message body, send && recv message
 type Message struct {
 	Room string
 	Name string
@@ -49,7 +50,7 @@ type Client struct {
 	send chan Message
 }
 
-// readPump pumps messages from the websocket connection to the hub.
+// readPump pumps messages from the websocket connection to the room.
 //
 // The application runs readPump in a per-connection goroutine. The application
 // ensures that there is at most one reader on a connection by executing all
@@ -77,7 +78,7 @@ func (c *Client) readPump() {
 	}
 }
 
-// writePump pumps messages from the hub to the websocket connection.
+// writePump pumps messages from the room to the websocket connection.
 //
 // A goroutine running writePump is started for each connection. The
 // application ensures that there is at most one writer to a connection by

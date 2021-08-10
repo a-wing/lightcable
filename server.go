@@ -17,6 +17,8 @@ const (
 	readyStateClosed
 )
 
+// Core Websocket Server. use callback notification message
+// broadcast message, A Server auto create and manage multiple goroutines
 type Server struct {
 	config *Config
 	worker map[string]*worker
@@ -40,6 +42,7 @@ type Server struct {
 	onConnClose func(*Client, error)
 }
 
+// New creates a new Server.
 func New(cfg *Config) *Server {
 	return &Server{
 		config: cfg.Worker,
@@ -60,6 +63,7 @@ func New(cfg *Config) *Server {
 	}
 }
 
+// Need use 'go server.Run(context.Background())' run daemon
 func (s *Server) Run(ctx context.Context) {
 	s.readyState = readyStateRunning
 	for {
@@ -93,6 +97,8 @@ func (s *Server) Run(ctx context.Context) {
 	}
 }
 
+// Interface 'http.Handler', creates new websocket connection
+// Maybe Create new Worker. worker == room
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if room, name, ok := s.onConnected(w, r); ok {
 		conn, err := upgrader.Upgrade(w, r, nil)
@@ -126,22 +132,30 @@ func (s *Server) Broadcast(room, name string, code int, data []byte) {
 	}
 }
 
+// All Websocket Conn Recv Message will callback this function
+// This have Block worker. Block this room
 func (s *Server) OnMessage(fn func(*Message)) {
 	s.onMessage = fn
 }
 
+// Auth this websocket connection callback
+// ok: true Allows connection; false Reject connection
+// Maybe Concurrent. unique ID need self use sync.Mutex
 func (s *Server) OnConnected(fn func(w http.ResponseWriter, r *http.Request) (room, name string, ok bool)) {
 	s.onConnected = fn
 }
 
+// websocket connection successfully. block worker
 func (s *Server) OnConnReady(fn func(*Client)) {
 	s.onConnReady = fn
 }
 
+// server safely shutdown done callback
 func (s *Server) OnServClose(fn func()) {
 	s.onServClose = fn
 }
 
+// This Worker All Conn all closed, worker close
 func (s *Server) OnRoomClose(fn func(room string)) {
 	s.onRoomClose = fn
 }
