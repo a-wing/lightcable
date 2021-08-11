@@ -1,6 +1,7 @@
 package lightcable
 
-// Server need config
+// Config describes the configuration of the server.
+// server should worker, every worker use this configuration
 type Config struct {
 	SignBufferCount int
 	CastBufferCount int
@@ -8,7 +9,7 @@ type Config struct {
 	Worker *Config
 }
 
-// Default Server config
+// DefaultConfig is a server with all fields set to the default values.
 var DefaultConfig = &Config{
 	SignBufferCount: 128,
 	CastBufferCount: 128,
