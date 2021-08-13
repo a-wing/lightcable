@@ -38,22 +38,34 @@ func (w *worker) run(ctx context.Context) {
 	for {
 		select {
 		case client := <-w.register:
+			if len(w.clients) == 0 {
+				// This in order to noblock server threads, use worker threads callback
+				w.server.onRoomReady(w.room)
+			}
+
 			w.clients[client] = true
 
 			go client.readPump()
 			go client.writePump(ctx)
 
+			// client has two threads
+			// So execute the callback here
 			w.server.onConnReady(client)
 		case client := <-w.unregister:
 			if _, ok := w.clients[client]; ok {
 				delete(w.clients, client)
 				close(client.send)
 			}
+
+			// client has two threads
+			// So execute the callback here
 			w.server.onConnClose(client, client.err)
 
 			// Last client, need close this room
 			if len(w.clients) == 0 {
 				w.server.unregister <- client
+
+				// This in order to noblock server threads, use worker threads callback
 				w.server.onRoomClose(w.room)
 				return
 			}

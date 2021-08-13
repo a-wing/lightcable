@@ -37,10 +37,11 @@ type Server struct {
 
 	onMessage   func(*Message)
 	onConnected func(w http.ResponseWriter, r *http.Request) (room, name string, ok bool)
+	onRoomReady func(room string)
 	onConnReady func(*Client)
-	onServClose func()
-	onRoomClose func(room string)
 	onConnClose func(*Client, error)
+	onRoomClose func(room string)
+	onServClose func()
 }
 
 // New creates a new Server.
@@ -57,10 +58,11 @@ func New(cfg *Config) *Server {
 		onConnected: func(w http.ResponseWriter, r *http.Request) (room, name string, ok bool) {
 			return r.URL.Path, getUniqueID(), true
 		},
+		onRoomReady: func(room string) {},
 		onConnReady: func(*Client) {},
-		onServClose: func() {},
-		onRoomClose: func(room string) {},
 		onConnClose: func(*Client, error) {},
+		onRoomClose: func(room string) {},
+		onServClose: func() {},
 	}
 }
 
@@ -74,13 +76,6 @@ func (s *Server) Run(ctx context.Context) {
 		// close and open concurrency
 		case c := <-s.unregister:
 			delete(s.worker, c.Room)
-
-			// Last room, server onClose
-			if len(s.worker) == 0 && s.readyState == readyStateClosing {
-				s.onServClose()
-				s.readyState = readyStateClosed
-				return
-			}
 		case c := <-s.register:
 			c.worker = s.worker[c.Room]
 			if c.worker == nil {
@@ -95,6 +90,13 @@ func (s *Server) Run(ctx context.Context) {
 			}
 		case <-ctx.Done():
 			s.readyState = readyStateClosing
+
+			// Last room, server onClose
+			if len(s.worker) == 0 && s.readyState == readyStateClosing {
+				s.onServClose()
+				s.readyState = readyStateClosed
+				return
+			}
 		}
 	}
 }
@@ -150,15 +152,21 @@ func (s *Server) OnConnected(fn func(w http.ResponseWriter, r *http.Request) (ro
 	s.onConnected = fn
 }
 
+// OnRoomReady Create a new room successfully
+func (s *Server) OnRoomReady(fn func(room string)) {
+	s.onRoomReady = fn
+}
+
 // OnConnReady websocket connection successfully and join room
 // this will block worker
 func (s *Server) OnConnReady(fn func(*Client)) {
 	s.onConnReady = fn
 }
 
-// OnServClose server safely shutdown done callback
-func (s *Server) OnServClose(fn func()) {
-	s.onServClose = fn
+// OnConnClose will Client error or websocket close or server close
+// if context server closed err == nil
+func (s *Server) OnConnClose(fn func(*Client, error)) {
+	s.onConnClose = fn
 }
 
 // OnRoomClose worker all websocket connection closed, worker close
@@ -166,8 +174,7 @@ func (s *Server) OnRoomClose(fn func(room string)) {
 	s.onRoomClose = fn
 }
 
-// OnConnClose will Client error or websocket close or server close
-// if context server closed err == nil
-func (s *Server) OnConnClose(fn func(*Client, error)) {
-	s.onConnClose = fn
+// OnServClose server safely shutdown done callback
+func (s *Server) OnServClose(fn func()) {
+	s.onServClose = fn
 }

@@ -82,6 +82,42 @@ func TestServer(t *testing.T) {
 	<-sign
 }
 
+func TestServerCallback(t *testing.T) {
+	server, conns := makeConns(t, "/test")
+	ws := conns[0]
+
+	signServ := make(chan bool)
+	signRoom := make(chan bool)
+	signConn := make(chan bool)
+	signMsg := make(chan bool)
+
+	server.OnRoomReady(func(room string) { signRoom <- true })
+	server.OnConnReady(func(c *Client) { signConn <- true })
+	server.OnMessage(func(m *Message) { signMsg <- true })
+	server.OnConnClose(func(c *Client, err error) { signConn <- true })
+	server.OnRoomClose(func(room string) { signRoom <- true })
+	server.OnServClose(func() { signServ <- true })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go server.Run(ctx)
+	data := make([]byte, 4096)
+	n, err := rand.Read(data)
+	if err != nil {
+		t.Error(err)
+	}
+	ws.WriteMessage(websocket.TextMessage, data[:n])
+	ws.WriteMessage(websocket.CloseMessage, []byte{})
+
+	<-signRoom
+	<-signConn
+	<-signMsg
+	<-signConn
+	<-signRoom
+
+	cancel()
+	<-signServ
+}
+
 func TestServerBroadcast(t *testing.T) {
 	server, conns := makeConns(t, "/test", "/test", "/test-2")
 	ws, ws2, ws3 := conns[0], conns[1], conns[2]
