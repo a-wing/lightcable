@@ -70,6 +70,21 @@ func New(cfg *Config) *Server {
 // in order to concurrency. server instance only a run
 func (s *Server) Run(ctx context.Context) {
 	s.readyState = readyStateRunning
+	defer func() {
+		for {
+			// Last room, server onClose
+			if len(s.worker) == 0 && s.readyState == readyStateClosing {
+				s.onServClose()
+				s.readyState = readyStateClosed
+				return
+			}
+
+			select {
+			case c := <-s.unregister:
+				delete(s.worker, c.Room)
+			}
+		}
+	}()
 	for {
 		select {
 		// unregister must first
@@ -90,13 +105,7 @@ func (s *Server) Run(ctx context.Context) {
 			}
 		case <-ctx.Done():
 			s.readyState = readyStateClosing
-
-			// Last room, server onClose
-			if len(s.worker) == 0 && s.readyState == readyStateClosing {
-				s.onServClose()
-				s.readyState = readyStateClosed
-				return
-			}
+			return
 		}
 	}
 }
