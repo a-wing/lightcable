@@ -39,7 +39,7 @@ type Server struct {
 	onConnected func(w http.ResponseWriter, r *http.Request) (room, name string, ok bool)
 	onRoomReady func(room string)
 	onConnReady func(*Client)
-	onConnClose func(*Client, error)
+	onConnClose func(*Client)
 	onRoomClose func(room string)
 	onServClose func()
 }
@@ -62,7 +62,7 @@ func New(cfg *Config) *Server {
 		},
 		onRoomReady: func(room string) {},
 		onConnReady: func(*Client) {},
-		onConnClose: func(*Client, error) {},
+		onConnClose: func(*Client) {},
 		onRoomClose: func(room string) {},
 		onServClose: func() {},
 	}
@@ -173,7 +173,7 @@ func (s *Server) OnConnReady(fn func(*Client)) {
 
 // OnConnClose will Client error or websocket close or server close
 // if context server closed err == nil
-func (s *Server) OnConnClose(fn func(*Client, error)) {
+func (s *Server) OnConnClose(fn func(*Client)) {
 	s.onConnClose = fn
 }
 

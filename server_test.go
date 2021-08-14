@@ -96,7 +96,7 @@ func TestServerCallback(t *testing.T) {
 	server.OnRoomReady(func(room string) { signRoom <- true })
 	server.OnConnReady(func(c *Client) { signConn <- true })
 	server.OnMessage(func(m *Message) { signMsg <- true })
-	server.OnConnClose(func(c *Client, err error) { signConn <- true })
+	server.OnConnClose(func(c *Client) { signConn <- true })
 	server.OnRoomClose(func(room string) { signRoom <- true })
 	server.OnServClose(func() { signServ <- true })
 

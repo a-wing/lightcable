@@ -42,7 +42,7 @@ type Client struct {
 	Name string
 	Room string
 
-	err error
+	Err error
 
 	worker *worker
 
@@ -63,12 +63,17 @@ func (c *Client) readPump() {
 		c.worker.unregister <- c
 		c.conn.Close()
 	}()
-	c.conn.SetReadDeadline(time.Now().Add(pongWait))
-	c.conn.SetPongHandler(func(string) error { c.conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
+	if err := c.conn.SetReadDeadline(time.Now().Add(pongWait)); err != nil {
+		c.Err = err
+	}
+	c.conn.SetPongHandler(func(string) error {
+		return c.conn.SetReadDeadline(time.Now().Add(pongWait))
+	})
+
 	for {
 		code, data, err := c.conn.ReadMessage()
 		if err != nil {
-			c.err = err
+			c.Err = err
 			break
 		}
 		c.worker.broadcast <- Message{
@@ -95,26 +100,34 @@ func (c *Client) writePump(ctx context.Context) {
 	for {
 		select {
 		case msg, ok := <-c.send:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := c.conn.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
+				c.Err = err
+			}
 			if !ok {
 				// The worker closed the channel.
-				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+				if err := c.conn.WriteMessage(websocket.CloseMessage, []byte{}); err != nil {
+					c.Err = err
+				}
 				return
 			}
 
 			if err := c.conn.WriteMessage(msg.Code, msg.Data); err != nil {
-				c.err = err
+				c.Err = err
 				return
 			}
 
 		case <-ticker.C:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := c.conn.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
+				c.Err = err
+			}
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				c.err = err
+				c.Err = err
 				return
 			}
 		case <-ctx.Done():
-			c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+			if err := c.conn.WriteMessage(websocket.CloseMessage, []byte{}); err != nil {
+				c.Err = err
+			}
 			return
 		}
 	}

@@ -59,7 +59,7 @@ func (w *worker) run(ctx context.Context) {
 
 			// client has two threads
 			// So execute the callback here
-			w.server.onConnClose(client, client.err)
+			w.server.onConnClose(client)
 
 			// Last client, need close this room
 			if len(w.clients) == 0 {
