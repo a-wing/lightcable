@@ -83,12 +83,12 @@ func TestServer(t *testing.T) {
 }
 
 func TestServerCallback(t *testing.T) {
-	server, conns := makeConns(t, "/test")
+	server, conns := makeConns(t, "/test", "/test-2")
 	ws := conns[0]
 
-	signServ := make(chan bool)
-	signRoom := make(chan bool)
-	signConn := make(chan bool)
+	signServ := make(chan bool, 4)
+	signRoom := make(chan bool, 4)
+	signConn := make(chan bool, 4)
 	signMsg := make(chan bool)
 
 	server.OnRoomReady(func(room string) { signRoom <- true })
