@@ -50,6 +50,8 @@ func New(cfg *Config) *Server {
 		config: cfg.Worker,
 		worker: make(map[string]*worker),
 
+		readyState: readyStateOpening,
+
 		register:   make(chan *Client, cfg.SignBufferCount),
 		broadcast:  make(chan Message, cfg.CastBufferCount),
 		unregister: make(chan *Client, cfg.SignBufferCount),
@@ -79,10 +81,7 @@ func (s *Server) Run(ctx context.Context) {
 				return
 			}
 
-			select {
-			case c := <-s.unregister:
-				delete(s.worker, c.Room)
-			}
+			delete(s.worker, (<-s.unregister).Room)
 		}
 	}()
 	for {
