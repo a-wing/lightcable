@@ -54,7 +54,9 @@ func TestServer(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		ws.WriteMessage(websocket.TextMessage, data[:n])
+		if err := ws.WriteMessage(websocket.TextMessage, data[:n]); err != nil {
+			t.Error(err)
+		}
 
 		code, recv, err := ws2.ReadMessage()
 		if err != nil {
@@ -105,8 +107,12 @@ func TestServerCallback(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	ws.WriteMessage(websocket.TextMessage, data[:n])
-	ws.WriteMessage(websocket.CloseMessage, []byte{})
+	if err := ws.WriteMessage(websocket.TextMessage, data[:n]); err != nil {
+		t.Error(err)
+	}
+	if err := ws.WriteMessage(websocket.CloseMessage, []byte{}); err != nil {
+		t.Error(err)
+	}
 
 	<-signRoom
 	<-signConn
@@ -217,7 +223,9 @@ func TestServerVeryMuchRoom(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
-			ws.WriteMessage(websocket.TextMessage, data[:n])
+			if err := ws.WriteMessage(websocket.TextMessage, data[:n]); err != nil {
+				t.Error(err)
+			}
 		}
 	}
 	cancel()

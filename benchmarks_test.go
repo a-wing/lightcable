@@ -33,7 +33,9 @@ func BenchmarkBroadcast(b *testing.B) {
 		b.Error(err)
 	}
 	for i := 0; i < b.N; i++ {
-		ws.WriteMessage(websocket.TextMessage, data[:n])
+		if err := ws.WriteMessage(websocket.TextMessage, data[:n]); err != nil {
+			b.Error(err)
+		}
 
 		if code, recv, err := ws2.ReadMessage(); err == nil {
 			if code != websocket.TextMessage {
