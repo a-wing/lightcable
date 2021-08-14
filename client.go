@@ -125,9 +125,7 @@ func (c *Client) writePump(ctx context.Context) {
 				return
 			}
 		case <-ctx.Done():
-			if err := c.conn.WriteMessage(websocket.CloseMessage, []byte{}); err != nil {
-				c.Err = err
-			}
+			c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 			return
 		}
 	}
