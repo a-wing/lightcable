@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	address := flag.String("p", "0.0.0.0:8080", "set server port")
+	address := flag.String("l", "0.0.0.0:8080", "set server listen address and port")
 	help := flag.Bool("h", false, "this help")
 	flag.Parse()
 
@@ -22,7 +22,6 @@ func main() {
 	server := lightcable.New(lightcable.DefaultConfig)
 	go server.Run(context.Background())
 
-	log.Println("===============")
-	log.Println("Listen Port", *address)
+	log.Println("Listen address:", *address)
 	log.Fatal(http.ListenAndServe(*address, server))
 }

@@ -24,6 +24,9 @@ lightweight websocket channel server
 
 ```bash
 go get -u github.com/a-wing/lightcable/cmd/lightcable
+
+# Listen port: 8088
+lightcable -l localhost:8088
 ```
 
 ### URL
