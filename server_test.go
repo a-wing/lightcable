@@ -16,6 +16,23 @@ func makeWsProto(s string) string {
 	return "ws" + strings.TrimPrefix(s, "http")
 }
 
+func TestNoWebSocket(t *testing.T) {
+	server := New(DefaultConfig)
+	ctx, cancel := context.WithCancel(context.Background())
+	sign := make(chan bool)
+	server.OnServClose(func() {
+		sign <- true
+	})
+	go server.Run(ctx)
+	httpServer := httptest.NewServer(server)
+	client := httpServer.Client()
+	if res, err := client.Get(httpServer.URL + "/test"); err != nil {
+		t.Errorf("Should websocket upgrader error: %+v, %s\n", res, err)
+	}
+	cancel()
+	<-sign
+}
+
 func makeConns(t testing.TB, rooms ...string) (*Server, []*websocket.Conn) {
 	server := New(DefaultConfig)
 	httpServer := httptest.NewServer(server)
