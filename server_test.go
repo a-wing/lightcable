@@ -141,6 +141,47 @@ func TestServerCallback(t *testing.T) {
 	<-signServ
 }
 
+func TestServerLocal(t *testing.T) {
+	config := DefaultConfig
+	config.Worker.Local = true
+	server := New(DefaultConfig)
+	httpServer := httptest.NewServer(server)
+	ws, _, err := websocket.DefaultDialer.Dial(makeWsProto(httpServer.URL+"/test"), nil)
+	if err != nil {
+		t.Error(err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	sign := make(chan bool)
+	server.OnServClose(func() {
+		sign <- true
+	})
+	join := make(chan string)
+	server.OnConnReady(func(c *Client) {
+		join <- c.Name
+	})
+	go server.Run(ctx)
+
+	// Need wait for connection ready
+	<-join
+
+	data := []byte("xxx")
+	ws.WriteMessage(websocket.BinaryMessage, data)
+	code, data2, err := ws.ReadMessage()
+	if err != nil {
+		t.Error(err)
+	}
+	if code != websocket.BinaryMessage {
+		t.Error("websocket data type:", code)
+	}
+	if string(data) != string(data2) {
+		t.Errorf("ReadMessage is: %s", data2)
+	}
+
+	cancel()
+	<-sign
+}
+
 func TestServerBroadcast(t *testing.T) {
 	server, conns := makeConns(t, "/test", "/test", "/test-2")
 	ws, ws2, ws3 := conns[0], conns[1], conns[2]

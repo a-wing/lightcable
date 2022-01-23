@@ -23,5 +23,6 @@ var DefaultConfig = &Config{
 	Worker: &Config{
 		SignBufferCount: 128,
 		CastBufferCount: 128,
+		Local:           false,
 	},
 }
