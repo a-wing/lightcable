@@ -2,6 +2,7 @@ package lightcable
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 
@@ -121,18 +122,39 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// The server lack of resources: close the connection
-		select {
-		case s.register <- &Client{
+		if err := s.addClient(&Client{
 			Room: room,
 			Name: name,
 			conn: conn,
 			send: make(chan Message, 256),
-		}:
-		default:
+		}); err != nil {
+			// The server lack of resources: close the connection
 			conn.WriteMessage(websocket.CloseMessage, []byte{})
 		}
 	}
+}
+
+// Add a New Websocket Client
+func (s *Server) Upgrade(w http.ResponseWriter, r *http.Request, room, name string) error {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		return err
+	}
+	return s.addClient(&Client{
+		Room: room,
+		Name: name,
+		conn: conn,
+		send: make(chan Message, 256),
+	})
+}
+
+func (s *Server) addClient(c *Client) (err error) {
+	select {
+	case s.register <- c:
+	default:
+		err = errors.New("Buffer Always Full")
+	}
+	return
 }
 
 // Broadcast will room all websocket connection send message
