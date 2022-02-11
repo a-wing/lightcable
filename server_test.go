@@ -33,8 +33,7 @@ func TestNoWebSocket(t *testing.T) {
 	<-sign
 }
 
-func makeConns(t testing.TB, rooms ...string) (*Server, []*websocket.Conn) {
-	server := New(DefaultConfig)
+func makeConns(t testing.TB, server *Server, rooms ...string) []*websocket.Conn {
 	httpServer := httptest.NewServer(server)
 	conns := make([]*websocket.Conn, len(rooms))
 	var err error
@@ -43,11 +42,12 @@ func makeConns(t testing.TB, rooms ...string) (*Server, []*websocket.Conn) {
 			t.Error(err)
 		}
 	}
-	return server, conns
+	return conns
 }
 
 func TestServer(t *testing.T) {
-	server, conns := makeConns(t, "/test", "/test")
+	server := New(DefaultConfig)
+	conns := makeConns(t, server, "/test", "/test")
 	ws, ws2 := conns[0], conns[1]
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -102,7 +102,8 @@ func TestServer(t *testing.T) {
 }
 
 func TestServerCallback(t *testing.T) {
-	server, conns := makeConns(t, "/test", "/test-2")
+	server := New(DefaultConfig)
+	conns := makeConns(t, server, "/test", "/test-2")
 	ws := conns[0]
 
 	signServ := make(chan bool, 4)
@@ -145,11 +146,8 @@ func TestServerLocal(t *testing.T) {
 	config := DefaultConfig
 	config.Worker.Local = true
 	server := New(DefaultConfig)
-	httpServer := httptest.NewServer(server)
-	ws, _, err := websocket.DefaultDialer.Dial(makeWsProto(httpServer.URL+"/test"), nil)
-	if err != nil {
-		t.Error(err)
-	}
+	conns := makeConns(t, server, "/test")
+	ws := conns[0]
 
 	ctx, cancel := context.WithCancel(context.Background())
 	sign := make(chan bool)
@@ -183,7 +181,8 @@ func TestServerLocal(t *testing.T) {
 }
 
 func TestServerBroadcast(t *testing.T) {
-	server, conns := makeConns(t, "/test", "/test", "/test-2")
+	server := New(DefaultConfig)
+	conns := makeConns(t, server, "/test", "/test", "/test-2")
 	ws, ws2, ws3 := conns[0], conns[1], conns[2]
 
 	ctx, cancel := context.WithCancel(context.Background())
