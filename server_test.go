@@ -248,6 +248,80 @@ func TestServerBroadcast(t *testing.T) {
 	<-sign
 }
 
+func TestServerBroadcastAll(t *testing.T) {
+	server := New(DefaultConfig)
+	conns := makeConns(t, server, "/test", "/test", "/test-2")
+	ws, ws2, ws3 := conns[0], conns[1], conns[2]
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	sign := make(chan bool)
+	server.OnServClose(func() {
+		sign <- true
+	})
+	join := make(chan string)
+	server.OnConnReady(func(c *Client) {
+		join <- c.Name
+	})
+	go server.Run(ctx)
+
+	// Need wait for connection ready
+	<-join
+	<-join
+	<-join
+
+	for i := 0; i < 10; i++ {
+		data := make([]byte, 4096)
+		n, err := rand.Read(data)
+		if err != nil {
+			t.Error(err)
+		}
+		server.BroadcastAll("test", websocket.TextMessage, data[:n])
+
+		// ws
+		if code, recv, err := ws.ReadMessage(); err == nil {
+			if code != websocket.TextMessage {
+				t.Error("Type should TextMessage")
+			}
+
+			if string(recv) != string(data[:n]) {
+				t.Error("Data should Equal")
+			}
+		} else {
+			t.Error(err)
+		}
+
+		// ws2
+		if code, recv, err := ws2.ReadMessage(); err == nil {
+			if code != websocket.TextMessage {
+				t.Error("Type should TextMessage")
+			}
+
+			if string(recv) != string(data[:n]) {
+				t.Error("Data should Equal")
+			}
+		} else {
+			t.Error(err)
+		}
+
+		// ws3
+		if code, recv, err := ws3.ReadMessage(); err == nil {
+			if code != websocket.TextMessage {
+				t.Error("Type should TextMessage")
+			}
+
+			if string(recv) != string(data[:n]) {
+				t.Error("Data should Equal")
+			}
+		} else {
+			t.Error(err)
+		}
+
+	}
+
+	cancel()
+	<-sign
+}
+
 func TestServerVeryMuchRoom(t *testing.T) {
 	server := New(DefaultConfig)
 	ctx, cancel := context.WithCancel(context.Background())

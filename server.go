@@ -31,6 +31,9 @@ type Server struct {
 	// Inbound messages from the clients.
 	broadcast chan Message
 
+	// Inbound All Room Message
+	broadcastAll chan Message
+
 	// Unregister requests from clients.
 	unregister chan *Client
 
@@ -56,6 +59,8 @@ func New(cfg *Config) *Server {
 		register:   make(chan *Client, cfg.SignBufferCount),
 		broadcast:  make(chan Message, cfg.CastBufferCount),
 		unregister: make(chan *Client, cfg.SignBufferCount),
+
+		broadcastAll: make(chan Message, cfg.CastBufferCount),
 
 		onMessage: func(*Message) {},
 		onConnected: func(w http.ResponseWriter, r *http.Request) (room, name string, ok bool) {
@@ -102,6 +107,15 @@ func (s *Server) Run(ctx context.Context) {
 		case m := <-s.broadcast:
 			if worker, ok := s.worker[m.Room]; ok {
 				worker.broadcast <- m
+			}
+		case m := <-s.broadcastAll:
+			for _, worker := range s.worker {
+
+				// This should not be blocked
+				select {
+				case worker.broadcast <- m:
+				default:
+				}
 			}
 		case <-ctx.Done():
 			s.readyState = readyStateClosing
@@ -165,6 +179,15 @@ func (s *Server) Broadcast(room, name string, code int, data []byte) {
 	s.broadcast <- Message{
 		Name: name,
 		Room: room,
+		Code: code,
+		Data: data,
+	}
+}
+
+// BroadcastAll will all room all websocket connection send message
+func (s *Server) BroadcastAll(name string, code int, data []byte) {
+	s.broadcastAll <- Message{
+		Name: name,
 		Code: code,
 		Data: data,
 	}
