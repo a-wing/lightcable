@@ -3,6 +3,7 @@ package lightcable
 import (
 	"context"
 	"math/rand"
+	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"strings"
@@ -33,8 +34,7 @@ func TestNoWebSocket(t *testing.T) {
 	<-sign
 }
 
-func makeConns(t testing.TB, rooms ...string) (*Server, []*websocket.Conn) {
-	server := New(DefaultConfig)
+func makeConns(t testing.TB, server http.Handler, rooms ...string) []*websocket.Conn {
 	httpServer := httptest.NewServer(server)
 	conns := make([]*websocket.Conn, len(rooms))
 	var err error
@@ -43,11 +43,71 @@ func makeConns(t testing.TB, rooms ...string) (*Server, []*websocket.Conn) {
 			t.Error(err)
 		}
 	}
-	return server, conns
+	return conns
 }
 
 func TestServer(t *testing.T) {
-	server, conns := makeConns(t, "/test", "/test")
+	server := New(DefaultConfig)
+	conns := makeConns(t, server, "/test", "/test")
+	ws, ws2 := conns[0], conns[1]
+
+	ctx, cancel := context.WithCancel(context.Background())
+	sign := make(chan bool)
+	server.OnServClose(func() {
+		sign <- true
+	})
+	join := make(chan string)
+	server.OnConnReady(func(c *Client) {
+		join <- c.Name
+	})
+	go server.Run(ctx)
+
+	// Need wait for connection ready
+	<-join
+	<-join
+
+	for i := 0; i < 10; i++ {
+		data := make([]byte, 4096)
+		n, err := rand.Read(data)
+		if err != nil {
+			t.Error(err)
+		}
+		if err := ws.WriteMessage(websocket.TextMessage, data[:n]); err != nil {
+			t.Error(err)
+		}
+
+		code, recv, err := ws2.ReadMessage()
+		if err != nil {
+			t.Error(err)
+		}
+
+		if code != websocket.TextMessage {
+			t.Error("Type should TextMessage")
+		}
+
+		if string(recv) != string(data[:n]) {
+			t.Error("Data should Equal")
+		}
+	}
+
+	if err := ws.SetReadDeadline(time.Now().Add(time.Millisecond)); err != nil {
+		t.Error(err)
+	}
+
+	if _, _, err := ws.ReadMessage(); err == nil {
+		t.Error("Should have error")
+	}
+
+	cancel()
+	<-sign
+}
+
+func TestUpgradeServer(t *testing.T) {
+	server := New(DefaultConfig)
+
+	conns := makeConns(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		server.Upgrade(w, r, r.URL.Path, getUniqueID())
+	}), "/test", "/test")
 	ws, ws2 := conns[0], conns[1]
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -102,7 +162,8 @@ func TestServer(t *testing.T) {
 }
 
 func TestServerCallback(t *testing.T) {
-	server, conns := makeConns(t, "/test", "/test-2")
+	server := New(DefaultConfig)
+	conns := makeConns(t, server, "/test", "/test-2")
 	ws := conns[0]
 
 	signServ := make(chan bool, 4)
@@ -141,8 +202,47 @@ func TestServerCallback(t *testing.T) {
 	<-signServ
 }
 
+func TestServerLocal(t *testing.T) {
+	config := DefaultConfig
+	config.Worker.Local = true
+	server := New(DefaultConfig)
+	conns := makeConns(t, server, "/test")
+	ws := conns[0]
+
+	ctx, cancel := context.WithCancel(context.Background())
+	sign := make(chan bool)
+	server.OnServClose(func() {
+		sign <- true
+	})
+	join := make(chan string)
+	server.OnConnReady(func(c *Client) {
+		join <- c.Name
+	})
+	go server.Run(ctx)
+
+	// Need wait for connection ready
+	<-join
+
+	data := []byte("xxx")
+	ws.WriteMessage(websocket.BinaryMessage, data)
+	code, data2, err := ws.ReadMessage()
+	if err != nil {
+		t.Error(err)
+	}
+	if code != websocket.BinaryMessage {
+		t.Error("websocket data type:", code)
+	}
+	if string(data) != string(data2) {
+		t.Errorf("ReadMessage is: %s", data2)
+	}
+
+	cancel()
+	<-sign
+}
+
 func TestServerBroadcast(t *testing.T) {
-	server, conns := makeConns(t, "/test", "/test", "/test-2")
+	server := New(DefaultConfig)
+	conns := makeConns(t, server, "/test", "/test", "/test-2")
 	ws, ws2, ws3 := conns[0], conns[1], conns[2]
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -202,6 +302,80 @@ func TestServerBroadcast(t *testing.T) {
 
 	if _, _, err := ws3.ReadMessage(); err == nil {
 		t.Error("Should have error")
+	}
+
+	cancel()
+	<-sign
+}
+
+func TestServerBroadcastAll(t *testing.T) {
+	server := New(DefaultConfig)
+	conns := makeConns(t, server, "/test", "/test", "/test-2")
+	ws, ws2, ws3 := conns[0], conns[1], conns[2]
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	sign := make(chan bool)
+	server.OnServClose(func() {
+		sign <- true
+	})
+	join := make(chan string)
+	server.OnConnReady(func(c *Client) {
+		join <- c.Name
+	})
+	go server.Run(ctx)
+
+	// Need wait for connection ready
+	<-join
+	<-join
+	<-join
+
+	for i := 0; i < 10; i++ {
+		data := make([]byte, 4096)
+		n, err := rand.Read(data)
+		if err != nil {
+			t.Error(err)
+		}
+		server.BroadcastAll("test", websocket.TextMessage, data[:n])
+
+		// ws
+		if code, recv, err := ws.ReadMessage(); err == nil {
+			if code != websocket.TextMessage {
+				t.Error("Type should TextMessage")
+			}
+
+			if string(recv) != string(data[:n]) {
+				t.Error("Data should Equal")
+			}
+		} else {
+			t.Error(err)
+		}
+
+		// ws2
+		if code, recv, err := ws2.ReadMessage(); err == nil {
+			if code != websocket.TextMessage {
+				t.Error("Type should TextMessage")
+			}
+
+			if string(recv) != string(data[:n]) {
+				t.Error("Data should Equal")
+			}
+		} else {
+			t.Error(err)
+		}
+
+		// ws3
+		if code, recv, err := ws3.ReadMessage(); err == nil {
+			if code != websocket.TextMessage {
+				t.Error("Type should TextMessage")
+			}
+
+			if string(recv) != string(data[:n]) {
+				t.Error("Data should Equal")
+			}
+		} else {
+			t.Error(err)
+		}
+
 	}
 
 	cancel()

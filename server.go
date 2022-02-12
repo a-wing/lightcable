@@ -2,6 +2,7 @@ package lightcable
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 
@@ -30,6 +31,9 @@ type Server struct {
 	// Inbound messages from the clients.
 	broadcast chan Message
 
+	// Inbound All Room Message
+	broadcastAll chan Message
+
 	// Unregister requests from clients.
 	unregister chan *Client
 
@@ -55,6 +59,8 @@ func New(cfg *Config) *Server {
 		register:   make(chan *Client, cfg.SignBufferCount),
 		broadcast:  make(chan Message, cfg.CastBufferCount),
 		unregister: make(chan *Client, cfg.SignBufferCount),
+
+		broadcastAll: make(chan Message, cfg.CastBufferCount),
 
 		onMessage: func(*Message) {},
 		onConnected: func(w http.ResponseWriter, r *http.Request) (room, name string, ok bool) {
@@ -102,6 +108,15 @@ func (s *Server) Run(ctx context.Context) {
 			if worker, ok := s.worker[m.Room]; ok {
 				worker.broadcast <- m
 			}
+		case m := <-s.broadcastAll:
+			for _, worker := range s.worker {
+
+				// This should not be blocked
+				select {
+				case worker.broadcast <- m:
+				default:
+				}
+			}
 		case <-ctx.Done():
 			s.readyState = readyStateClosing
 			return
@@ -121,18 +136,39 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// The server lack of resources: close the connection
-		select {
-		case s.register <- &Client{
+		if err := s.addClient(&Client{
 			Room: room,
 			Name: name,
 			conn: conn,
 			send: make(chan Message, 256),
-		}:
-		default:
+		}); err != nil {
+			// The server lack of resources: close the connection
 			conn.WriteMessage(websocket.CloseMessage, []byte{})
 		}
 	}
+}
+
+// Add a New Websocket Client
+func (s *Server) Upgrade(w http.ResponseWriter, r *http.Request, room, name string) error {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		return err
+	}
+	return s.addClient(&Client{
+		Room: room,
+		Name: name,
+		conn: conn,
+		send: make(chan Message, 256),
+	})
+}
+
+func (s *Server) addClient(c *Client) (err error) {
+	select {
+	case s.register <- c:
+	default:
+		err = errors.New("Buffer Always Full")
+	}
+	return
 }
 
 // Broadcast will room all websocket connection send message
@@ -143,6 +179,15 @@ func (s *Server) Broadcast(room, name string, code int, data []byte) {
 	s.broadcast <- Message{
 		Name: name,
 		Room: room,
+		Code: code,
+		Data: data,
+	}
+}
+
+// BroadcastAll will all room all websocket connection send message
+func (s *Server) BroadcastAll(name string, code int, data []byte) {
+	s.broadcastAll <- Message{
+		Name: name,
 		Code: code,
 		Data: data,
 	}

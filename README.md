@@ -23,6 +23,12 @@ lightweight websocket channel server
 ### As a Application
 
 ```bash
+docker run ghcr.io/a-wing/lightcable
+```
+
+install && run
+
+```bash
 go get -u github.com/a-wing/lightcable/cmd/lightcable
 
 # Listen port: 8088

@@ -9,7 +9,8 @@ import (
 )
 
 func BenchmarkBroadcast(b *testing.B) {
-	server, conns := makeConns(b, "/test", "/test")
+	server := New(DefaultConfig)
+	conns := makeConns(b, server, "/test", "/test")
 	ws, ws2 := conns[0], conns[1]
 
 	ctx, cancel := context.WithCancel(context.Background())
