@@ -6,14 +6,14 @@ jobs:
   build:
     strategy:
       matrix:
-        go: ['1.17', '1.16', '1.15', '1.14', '1.13']
+        go: ['1.18', '1.17', '1.16', '1.15', '1.14', '1.13']
         platform: [ubuntu-latest]
     runs-on: ${{ matrix.platform }}
     steps:
     - uses: actions/checkout@v2
 
     - name: Set up Go
-      uses: actions/setup-go@v2
+      uses: actions/setup-go@v3
       with:
         go-version: ${{ matrix.go }}
 
