@@ -14,5 +14,7 @@ ulimit -n 1000000
 
 ```bash
 k6 run one-room-conn.js
+k6 run multi-room-conn.js
+k6 run one-room-msg.js
 ```
 

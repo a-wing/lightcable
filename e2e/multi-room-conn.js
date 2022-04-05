@@ -11,7 +11,7 @@ export const options = {
 
 export default function () {
   const url = 'ws://localhost:8080';
-  const path = '/e2e-room';
+  const path = '/' + Math.random();
 
   const res = ws.connect(url + path, socket => {
     socket.on('error', e => {

@@ -3,15 +3,16 @@ import { check } from 'k6';
 
 export const options = {
   stages: [
+    { duration: '10s', target: 100 },
     { duration: '10s', target: 1000 },
-    { duration: '10s', target: 10000 },
-    { duration: '10s', target: 10000 },
+    { duration: '10s', target: 1000 },
   ],
 };
 
 export default function () {
   const url = 'ws://localhost:8080';
   const path = '/e2e-room';
+  const data = 'test-data';
 
   const res = ws.connect(url + path, socket => {
     socket.on('error', e => {
@@ -19,6 +20,14 @@ export default function () {
         console.log('An unexpected error occured: ', e.error());
       }
     });
+
+    socket.on('message', msg => {
+      check(msg, { [`data is: ${data}`]: (d) => d === data });
+    });
+
+    socket.setInterval(() => {
+      socket.send(data);
+    }, 1000);
 
     socket.setTimeout(() => {
       socket.close();
