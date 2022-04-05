@@ -1,5 +1,7 @@
 builds:
-  - env:
+  -
+    main: ./cmd/lightcable
+    env:
       - CGO_ENABLED=0
     goos:
       - linux
