@@ -29,7 +29,7 @@ docker run -p 8080:8080 ghcr.io/a-wing/lightcable
 install && run
 
 ```bash
-go install github.com/a-wing/lightcable/cmd/lightcable
+go install github.com/a-wing/lightcable/cmd/lightcable@latest
 
 # Listen port: 8088
 lightcable -l localhost:8088
