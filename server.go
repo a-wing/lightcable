@@ -22,7 +22,7 @@ const (
 // broadcast message, A Server auto create and manage multiple goroutines
 // every room create worker
 type Server struct {
-	config *Config
+	config WorkerConfig
 	worker map[string]*worker
 
 	// Register requests from the clients.
@@ -56,10 +56,9 @@ func New(cfg *Config) *Server {
 
 		readyState: readyStateOpening,
 
-		register:   make(chan *Client, cfg.SignBufferCount),
-		broadcast:  make(chan Message, cfg.CastBufferCount),
-		unregister: make(chan *Client, cfg.SignBufferCount),
-
+		register:     make(chan *Client, cfg.SignBufferCount),
+		broadcast:    make(chan Message, cfg.CastBufferCount),
+		unregister:   make(chan *Client, cfg.SignBufferCount),
 		broadcastAll: make(chan Message, cfg.CastBufferCount),
 
 		onMessage: func(*Message) {},
@@ -140,7 +139,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			Room: room,
 			Name: name,
 			conn: conn,
-			send: make(chan Message, 256),
+			send: make(chan Message, s.config.CastBufferCount),
 		}); err != nil {
 			// The server lack of resources: close the connection
 			conn.WriteMessage(websocket.CloseMessage, []byte{})
@@ -158,7 +157,7 @@ func (s *Server) Upgrade(w http.ResponseWriter, r *http.Request, room, name stri
 		Room: room,
 		Name: name,
 		conn: conn,
-		send: make(chan Message, 256),
+		send: make(chan Message, s.config.CastBufferCount),
 	})
 }
 
