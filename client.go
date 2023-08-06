@@ -76,13 +76,15 @@ func (c *Client) readPump() {
 			c.Err = err
 			break
 		}
-		c.worker.broadcast <- Message{
+		msg := Message{
 			Name: c.Name,
 			Room: c.Room,
 			Code: code,
 			Data: data,
 			conn: c.conn,
 		}
+		c.worker.server.onMessage(&msg)
+		c.worker.broadcast <- msg
 	}
 }
 
