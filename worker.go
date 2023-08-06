@@ -70,7 +70,6 @@ func (w *worker) run(ctx context.Context) {
 				return
 			}
 		case message := <-w.broadcast:
-			w.server.onMessage(&message)
 			for client := range w.clients {
 				if w.server.config.Local || message.conn != client.conn {
 					select {
